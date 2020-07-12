@@ -1,0 +1,209 @@
+---
+title: "Milestone Report"
+author: "Anatoly Andrianov"
+date: "7/11/2020"
+output:
+  html_document:
+    # toc: true
+    # toc_float: true
+    theme: flatly
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The goal of this *Milestone Report* is to satisfy the requirements of the [week 2 assignment](https://www.coursera.org/learn/data-science-project/peer/BRX21/milestone-report) by demonstrating that I've gotten used to working with the project data set and that I'm "on track" to create my prediction algorithm.
+
+## Obtaining data
+
+The data for this project has been downloaded from [Capstone Dataset](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip).
+
+For simplicity I'm not including code used for file download and un-ZIPping.
+
+The downloaded data set (3 text files in `en_US` locale) have been stored in the directory structure following the original archive. The files are very large. The following code illustrates their size in MB:
+```{r files}
+# file sizes
+dataset.properties <- data.frame(row.names = c("blogs", "news", "twitter"),
+                                 fileSize = c(file.info("data/final/en_US/en_US.blogs.txt")$size/1024^2,
+                                              file.info("data/final/en_US/en_US.news.txt")$size/1024^2,
+                                              file.info("data/final/en_US/en_US.twitter.txt")$size/1024^2))
+dataset.properties
+```
+
+## Loading data
+
+The text data has been loaded into character vectors using the readLines command. The encoding has been set to `UTF-8` and `NULL` lines have been ignored. The code below illustrates the data loading process and resulting line counts.
+
+```{r loading}
+# first load blogs data
+# open file for reading
+blogs.file <- file("data/final/en_US/en_US.blogs.txt", "r")
+# read the content while ignoring the NULLs
+blogs.lines <- readLines(blogs.file, encoding = "UTF-8", skipNul = TRUE, warn = FALSE)
+# close file
+close(blogs.file)
+# get rid of un-used variable
+rm(blogs.file)
+
+#next load news data
+# open file for reading
+news.file <- file("data/final/en_US/en_US.news.txt", "r")
+# read the content while ignoring the NULLs
+news.lines <- readLines(news.file, encoding = "UTF-8", skipNul = TRUE, warn = FALSE)
+# close file
+close(news.file)
+# get rid of un-used variable
+rm(news.file)
+
+# finally load twitter data
+# open file for reading
+twitter.file <- file("data/final/en_US/en_US.twitter.txt", "r")
+# read the content while ignoring the NULLs
+twitter.lines <- readLines(twitter.file, encoding = "UTF-8", skipNul = TRUE, warn = FALSE)
+# close file
+close(twitter.file)
+# get rid of un-used variable
+rm(twitter.file)
+
+# line counts
+dataset.properties <- cbind(dataset.properties,
+                            lineCount = c(length(blogs.lines),
+                                          length(news.lines),
+                                          length(twitter.lines)))
+dataset.properties
+```
+
+
+## Major data features
+
+The character vectors have been briefly analyzed using the `stringi` [package](https://www.rdocumentation.org/packages/stringi/) by Marek Gagolewski.
+
+The table below summarizes the data set properties such as word counts (per data set and per line), character counts (per data set and per line).
+
+```{r data_features1, cache=TRUE}
+# load string processing library by Marek Gagolewski
+library(stringi)
+# data set properties
+# word counts
+dataset.properties <- cbind(dataset.properties,
+                            wordCount = c(sum(stri_count_words(blogs.lines)),
+                                          sum(stri_count_words(news.lines)),
+                                          sum(stri_count_words(twitter.lines))))
+# character counts
+dataset.properties <- cbind(dataset.properties,
+                            charCount = c(sum(nchar(blogs.lines)),
+                                          sum(nchar(news.lines)),
+                                          sum(nchar(twitter.lines))))
+# averages
+dataset.properties <- cbind(dataset.properties,
+                            avgWords = c(mean(stri_count_words(blogs.lines)),
+                                         mean(stri_count_words(news.lines)),
+                                         mean(stri_count_words(twitter.lines))))
+dataset.properties <- cbind(dataset.properties,
+                            avgChars = c(mean(nchar(blogs.lines)),
+                                         mean(nchar(news.lines)),
+                                         mean(nchar(twitter.lines))))
+dataset.properties
+```
+
+### Data sampling
+
+Because the complete data set is very large, we will continue our experimentation on a smaller sample of 10000 lines per data type. The resulting sample will be biased due to inconsistent sample size to file size ratio, but at this stage it's not important.
+```{r sampling}
+# set a random seed to ensure repeatability of the results
+set.seed(1234)
+# take a random sample of data (10,000 lines per source)
+sample.lines <- c(sample(blogs.lines, 10000),
+                  sample(news.lines, 10000),
+                  sample(twitter.lines, 10000))
+# free-up the memory
+rm(blogs.lines)
+rm(news.lines)
+rm(twitter.lines)
+gc()
+
+# clean-up non-ASCII characters
+sample.lines <- iconv(sample.lines, to = "ASCII", sub = "")
+# get rid of http/ftp/etc...
+sample.lines <- gsub("(f|ht)tp(s?)://(.*)[.][a-z]+", "", sample.lines)
+# get rid of @...
+sample.lines <- gsub("@[^\\s]+", "", sample.lines)
+```
+
+## Basic mining and clean-up
+
+We will perform basic text mining and data clean-up using the `tm` [package](https://www.rdocumentation.org/packages/tm) and `RWeka` [package](https://www.rdocumentation.org/packages/RWeka).
+
+We will create a corpus and clean it up (convert to lower case, strip white spaces/numbers/punctuation, and remove English stop words). The resulting clean corpus we will tokenize into uni-grams, by-grams, tri-grams and quad-grams. Finally we will show the frequency distributions for each type.
+
+```{r basic_mining, cache = TRUE}
+library(tm)
+# create corpus
+corpus <- VCorpus(VectorSource(sample.lines))
+# clean the corpus
+corpus <- tm_map(corpus, tolower)
+corpus <- tm_map(corpus, stripWhitespace)
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
+corpus <- tm_map(corpus, PlainTextDocument)
+# tokenize
+library(RWeka)
+# define tokenizer helper functions
+uniTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1))
+biTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 2, max = 2))
+triTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 3, max = 3))
+quadTokenizer <- function(x) NGramTokenizer(x, Weka_control(min = 4, max = 4))
+# tokenize
+unigrams <- TermDocumentMatrix(corpus, control = list(tokenize = uniTokenizer))
+bigrams <- TermDocumentMatrix(corpus, control = list(tokenize = biTokenizer))
+trigrams <- TermDocumentMatrix(corpus, control = list(tokenize = triTokenizer))
+quadgrams <- TermDocumentMatrix(corpus, control = list(tokenize = quadTokenizer))
+
+# get frequencies with low threshold of 100 to control the object size
+helper <- sort(rowSums(as.matrix(unigrams[findFreqTerms(unigrams, lowfreq = 100),])), decreasing = TRUE)
+uniFreqs <- data.frame(unigram=names(helper), frequency = helper)
+helper <- sort(rowSums(as.matrix(bigrams[findFreqTerms(bigrams, lowfreq = 100),])), decreasing = TRUE)
+biFreqs <- data.frame(bigram=names(helper), frequency = helper)
+helper <- sort(rowSums(as.matrix(trigrams[findFreqTerms(trigrams, lowfreq = 10),])), decreasing = TRUE)
+triFreqs <- data.frame(trigram=names(helper), frequency = helper)
+helper <- sort(rowSums(as.matrix(quadgrams[findFreqTerms(quadgrams, lowfreq = 2),])), decreasing = TRUE)
+quadFreqs <- data.frame(quadgram=names(helper), frequency = helper)
+rm(helper)
+```
+
+### Top uni-grams
+
+```{r plot1}
+library(ggplot2)
+ggplot(uniFreqs[1:20,], aes(x = reorder(unigram, frequency), y = frequency)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    labs(title = "Top 20 uni-grams") +
+    xlab("")
+```
+
+### Top bi-grams
+
+```{r plot2}
+ggplot(biFreqs, aes(x = reorder(bigram, frequency), y = frequency)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    labs(title = "Top bi-grams") +
+    xlab("")
+```
+
+### Top tri-grams
+
+```{r plot3}
+ggplot(triFreqs, aes(x = reorder(trigram, frequency), y = frequency)) +
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    labs(title = "Top tri-grams") +
+    xlab("")
+```
