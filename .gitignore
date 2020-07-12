@@ -41,3 +41,6 @@ vignettes/*.pdf
 # data directory (very large)
 data/*.zip
 data/*/*/*.txt
+
+# RPubs files
+rsconnect/
