@@ -39,6 +39,9 @@ rm(twitter.lines)
 require(quanteda)
 
 corp <- corpus(all.lines)
+
+rm(all.lines)
+
 toks <- tokens(corp,
                remove_punct = TRUE,
                remove_symbols = TRUE,
@@ -150,3 +153,15 @@ rm(mylist)
 db[,"ngram":=NULL]
 
 setkey(db, key)
+# get rid of duplicate entries, as we need only the first one...
+db1 <- db[!duplicated(key),]
+fwrite(db1, compress = "gzip", file = "data/db1.csv.gz")
+
+rm(freq.2gram)
+rm(freq.3gram)
+rm(freq.4gram)
+rm(freq.5gram)
+rm(db)
+rm(toks_l)
+
+

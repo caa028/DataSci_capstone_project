@@ -39,7 +39,7 @@ vignettes/*.pdf
 .Renviron
 
 # data directory (very large)
-data/*.zip
+data/
 data/*/*/*.txt
 
 # RPubs files
