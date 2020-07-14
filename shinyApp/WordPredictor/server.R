@@ -14,6 +14,7 @@
 
 library(shiny)
 # load required libraries
+library(R.utils)
 library(data.table)
 library(tm)
 library(stringr)
@@ -22,6 +23,7 @@ library(stringr)
 message <- "Loading prediction model"
 
 db <- fread("db.csv.gz")
+# db <- fread("db.csv")
 setkey(db, key)
 
 message <- "Prediction model loaded"

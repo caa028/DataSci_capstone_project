@@ -1,0 +1,48 @@
+Capstone Project Presentation
+========================================================
+author: Anatoly Andrianov
+date: July 14, 2020
+autosize: true
+
+Project Overview
+========================================================
+
+The goals of this [capstone project](https://www.coursera.org/learn/data-science-project)
+were to:
+
+- Become familiar with Natural Language Processing techiques
+- Experience real-world challenges associated with language data sets
+- Address performance/accuracy trade-offs
+- Investigate efficient implementation options
+- Demonstrate practical application of experience obtained in the program
+
+Used Algorithm
+========================================================
+
+The algorithm used for this project was [Katz's back-off model](https://en.wikipedia.org/wiki/Katz%27s_back-off_model) applied with progressive applied [n-gram](https://en.wikipedia.org/wiki/N-gram) history models.
+
+The run-time algorithm implements the following steps:
+
+1. Cleans and tokenizes the input text
+2. Selects the last 4 tokens and attempts prediction with 5-gram model
+3. If no prediction was found with 5-gram, drops the front token and switches to a shorter history model (4-gram, 3-gram and finally 2-gram)
+4. Returns predicted word back to UI
+
+Challenges
+========================================================
+
+The course material provided just very high-level guidance (quite misleading in *week 1*) on how to approach an NLP project. The online book [**Text Mining with R**](https://www.tidytextmining.com/index.html) was a good starting point. The Wikipedia pages on [*n-grams*](https://en.wikipedia.org/wiki/N-gram) and [*back-off*](https://en.wikipedia.org/wiki/Katz%27s_back-off_model) provided additional clarity.
+
+My [initial](http://rpubs.com/caa028/638384) approach to use [*tm*](https://www.rdocumentation.org/packages/tm) and [*RWeka*](https://www.rdocumentation.org/packages/RWeka) proven itself wrong from the effiency point of view.
+
+The processing (clean-up, building a corpus, tokenization, extraction of n-grams, building document-feature matrices and creation of frequency distributions) of the full data set was **VERY** resource consuming. I had to use the R memory very carefully, delete un-used objects and invoke garbage collection frequently... Still the memory utilization during model creation was spiking up to 25Gb.
+
+Shiny App
+========================================================
+
+The [*Shiny*](https://shiny.rstudio.com/) app that I've created and published at [https://caa028.shinyapps.io/WordPredictor/](https://caa028.shinyapps.io/WordPredictor/) has been heavily optimized for speed and efficiency.
+
+The model generated for this application was optimized for size and
+efficiency. 5-grams, 4-grams and 3-grams have been selected with frequencies of 2 and above. Any duplicates between these consecutively applied models have been eliminated. Once loaded in the application memory, the model occupies 201MB. The size of a model file distributed with the application is approximately 13.7MB.
+
+The user interface of this app is intentionally simplistic with emphasis on learning and efficiently implementing natural language processing techniques (with possible real-life application) rather than developing a fancy toy with tons of "bells and whistles".
