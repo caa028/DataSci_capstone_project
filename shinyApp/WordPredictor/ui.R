@@ -29,10 +29,11 @@ shinyUI(fluidPage(
         ),
         # Show a plot of the generated distribution
         mainPanel(
-            h3("Here comes the prediction: ", verbatimTextOutput("prediction")),
-            hr(),
             h3("The text you've entered:"),
             verbatimTextOutput("text1"),
+            hr(),
+            h3("Predicted word:"),
+            verbatimTextOutput("prediction"),
             hr(),
             code(textOutput("text2"))
         )
